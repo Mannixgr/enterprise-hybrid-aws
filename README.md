@@ -31,6 +31,7 @@ Multi-AZ VPC Provisioned via Terraform,deployed through GitHub actions Using OID
 |Hybrid link| AWS Site to Site VPN <-> Proxmox Homelab|
 
 ## Repository Structure
+```
 .
 ├── modules/
 │   ├── network/       # VPC, subnets, route tables, NAT
@@ -41,6 +42,7 @@ Multi-AZ VPC Provisioned via Terraform,deployed through GitHub actions Using OID
 │   └── workflows/     # CI/CD pipelines (plan on PR, apply on merge)
 ├── backend.tf
 └── README.md
+```
 
 ## SetUp 
 Deployment Automation is still a work in progress. This section will be updated as the Terraform modules land. Here is the Planned flow:
