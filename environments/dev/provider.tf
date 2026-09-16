@@ -17,6 +17,7 @@ provider "aws" {
       Project     = "enterprise-hybrid-aws"
       Environment = "dev"
       ManagedBy   = "terraform"
+      Owner       = "Mannix"
     }
   }
 }
