@@ -35,36 +35,28 @@ Multi-AZ VPC Provisioned via Terraform,deployed through GitHub actions Using OID
 .
 ├── modules/
 │   ├── network/       # VPC, subnets, route tables, NAT
-│   └── compute/       # EC2 instances, SSM access
+│   └── cicd-oidc/       # OIDC provider + IAM role for GitHub Actions. 
 ├── environments/
-│   └── dev/           # Environment-specific tfvars and backend config
+│   ├── dev/            # Environment-specific tfvars and backend config
+│   └── bootstrap/      # OIDC provider + IAM role, applied manually once
 ├── .github/
 │   └── workflows/     # CI/CD pipelines (plan on PR, apply on merge)
-├── backend.tf
 └── README.md
 ```
 
 ## SetUp 
-Deployment Automation is still a work in progress. This section will be updated as the Terraform modules land. Here is the Planned flow:
-```bash
-# Prerequisites: Terraform 1.10+, AWS CLI configured, an S3 bucket for state
-cd environments/dev
-terraform init
-terraform plan 
-terraform apply
-```
+Deployment Automation is completed. When a PR is opened touching `environments/dev/` or `modules/network/`-> GitHub Actions runs `terraform plan` automatically via OIDC so changes can be reviewed. Once the PR is merged to `main`, GitHub Actions runs `terraform apply` automatically which means nobody has to run terraform by hand and no long lived AWS credentials are required in the process. 
 ## Roadmap
 - [x] Repo scaffolded with module structure
-- [ ] AWS account Hygiene - MFA,IAM Identity Center,billing alerts,CloudTrail 
-- [ ] Terraform Remote state backend (S3 native locking)
-- [ ]  Multi-AZ VPC module 
-- [ ]  GitHub Actions OIDC Pipeline (Plan on PR,apply on merge)
+- [x] AWS account Hygiene - MFA,billing alerts,CloudTrail 
+- [x] Terraform Remote state backend (S3 native locking)
+- [x]  Multi-AZ VPC module 
+- [x]  GitHub Actions OIDC Pipeline (Plan on PR,apply on merge)
 - [ ] Site to Site VPN link to homelab 
 - [ ]  CloudWatch dashboard + alarms 
 
 ## Status 
-In Progress. This README will be updated as I complete the project and each phase is finished. I will provide proof of the VPC being live once it is completed with screenshots. 
-
+In Progress. This README will be updated as I complete the project.
 ## License 
 MIT
 
