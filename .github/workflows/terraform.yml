@@ -2,16 +2,19 @@
 name : Terraform
 
 on:
+  workflow_dispatch:
   pull_request:
     branches: [main]
     paths:
-        - "environments/dev/**"
-        -  "modules/network/**"
+      - "environments/dev/**"
+      - "modules/network/**"
+      - ".github/workflows/terraform.yml"
   push:
     branches: [main]
     paths:
       - "environments/dev/**"
-      -  "modules/network/**"
+      - "modules/network/**"
+
 permissions:
   id-token: write 
   contents: read

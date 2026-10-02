@@ -1,6 +1,10 @@
 # Local-only project notes (not published to GitHub)
 CLAUDE.md
+# macOS Finder metadata
+.DS_Store
 
+# Saved Terraform plan files (terraform plan -out=tfplan)
+*tfplan*
 # Local .terraform directories
 .terraform/
 
