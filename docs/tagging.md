@@ -8,7 +8,7 @@ Status: In Progress
 
 Last Update -  2026-10-06
 
-AWS tags are a way to get a better breakdown on cost data. It allows you to get the cost based on users, services and projects. If tags are not added then the cost optimizer could say "ec2 cost was $40" but it would not tell you the cost of something like dev network NAT gateway.  So tagging all products will give you a better break down of cost. 
+AWS tags are a way to get a better breakdown on cost data. It allows you to get the cost based on users, services and projects. If tags are not added then the cost optimizer could say "ec2 cost was $40" but it would not tell you the cost of something like dev network NAT gateway.  So tagging all resources will give you a better break down of cost. 
 
 | Key | Example | Where it's set | Why Optimizer would need it| Allowed Values | 
 |:-------|:--------|:--------|:--------|:--------|
@@ -16,7 +16,7 @@ AWS tags are a way to get a better breakdown on cost data. It allows you to get 
 | Environment| dev| provider default_tags| Will treat the dev env differently than prod| dev, bootstrap, prod 
 | Owner| Mannix| provider default_tags| Who get the recommendation| Mannix
 | ManagedBy| terraform |provider default_tags| Tells IaC resources from hand made ones. Hand made resoruces can not be fixed with a plan|terraform, manual
-|Purpose| network/ waste-lab| module-level, required | Which workload does it belong to| network 
+|Purpose| network| module-level, required | Which workload does it belong to| network,cicd, waste-lab
 | ExpiresOn| 2026-10-31| module-level, optional| A free waste detector: anything past the expiry date is waste by the definition.|YYYY-MM-DD
 
 ## Rules
