@@ -33,3 +33,11 @@ variable "project_name" {
   type        = string
   default     = "enterprise-hybrid-aws"
 }
+
+variable "enable_dashboard" {
+  description = "Create a CloudWatch dashboard for the NAT Gateway(s)."
+  type        = bool
+  default     = false
+}
+
+
