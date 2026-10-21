@@ -9,7 +9,7 @@ on:
     paths:
       - "environments/dev/**"
       - "modules/network/**"
-
+      - "modules/site-to-site-vpn/**"
 
 permissions:
   contents: read
@@ -27,6 +27,8 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    env:
+      TF_VAR_homelab_public_ip: ${{ secrets.HOMELAB_PUBLIC_IP }}
     defaults:
       run:
         working-directory: environments/dev
@@ -62,6 +64,8 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    env:
+      TF_VAR_homelab_public_ip: ${{ secrets.HOMELAB_PUBLIC_IP }}
     defaults:
       run:
         working-directory: environments/dev

@@ -14,3 +14,15 @@ module "network" {
   # Other module defaults (2 AZs, single NAT Gateway) are fine for dev.
   # Override here if this environment ever needs something different.
 }
+
+module "vpn" {
+  source = "../../modules/site-to-site-vpn"
+
+  project_name            = "enterprise-hybrid-aws-dev"
+  vpc_id                  = module.network.vpc_id
+  private_route_table_ids = module.network.private_route_table_ids
+  homelab_public_ip       = var.homelab_public_ip
+
+  tunnel1_inside_cidr = "169.254.10.0/30"
+  tunnel2_inside_cidr = "169.254.11.0/30"
+}
