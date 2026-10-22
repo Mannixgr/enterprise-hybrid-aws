@@ -1,110 +1,168 @@
-# Enterprise Hybrid AWS Environment 
- 
- This is a project that I am building to gain a better understanding of cloud computing mixed with a on Site homelab. The goal of the Project is to mimic enterprise infrastructure patterns. The project is supplied entirely as Code, deployed through secure CI/CD pipeline,monitored end to end and connected to the homelab. 
+# Enterprise Hybrid AWS Environment
 
-## What this demonstrates 
+I'm building this project to understand how cloud infrastructure works alongside an on-site homelab. The goal is to copy the patterns real infrastructure teams use: everything is defined as code, deployed through a secured CI/CD pipeline with review and approval gates, and connected to a Proxmox homelab over a site-to-site VPN.
 
-The goal of this project is to replace manual,click-ops cloud set up with the kind of workflow that you would see a team actually run :
+## What this demonstrates
 
-Infrastructure as Code -  a multi AZ AWS VPC and core networking, equiped with Terraform instead of the console, so the entire environment can be reproduced by running one command. 
+The aim is to replace manual, click-ops cloud setup with the kind of workflow a team would actually run:
 
-Secure CI/CD - deployments run through GitHub Actions using OIDC federation so there are no long lived AWS access keys stored anywhere. 
+- **Infrastructure as Code**: a multi-AZ AWS VPC, core networking and a site-to-site VPN, all built with Terraform instead of the console, so the environment can be torn down and rebuilt from the repo.
+- **Secure CI/CD**: GitHub Actions authenticates to AWS with OIDC federation, so no long-lived AWS access keys are stored anywhere. Planning and applying use separate IAM roles, and every apply waits for a human to approve it.
+- **Monitoring & observability**: a CloudWatch dashboard for the NAT gateway is built in code. CloudTrail is enabled at the account level (codifying it in Terraform is on the roadmap), and CloudWatch alarms are next.
+- **Hybrid networking**: the AWS VPC connects to a real on-premises Proxmox homelab over an IPsec site-to-site VPN, so this is more than a cloud-only sandbox. The AWS side is built; the homelab endpoint is in progress.
 
-Monitoring & observability - CloudWatch and CloudTrail wired in from day one for visibility into infrastructure health and account activity. 
+## Architecture
 
-Hybrid Networking - the AWS VPC is linked to a real on premises homelab running Proxmox over a site to Site connection so this project expands beyond just a Cloud only sandbox. 
+![Cloud architecture: gated CI/CD, multi-AZ VPC, site-to-site VPN](docs/hybridhomelab.svg)
 
-## Architecture 
+![Homelab network: double NAT, Proxmox LAN, strongSwan VPN endpoint](docs/homelab-network.svg)
 
-![Hybrid AWS and homelab architecture diagram](docs/hybridhomelab.drawio.svg)
+A multi-AZ VPC (`10.20.0.0/16`) in `ca-central-1` is provisioned with Terraform and deployed through GitHub Actions using OIDC. A Virtual Private Gateway provides two IPsec tunnels for a strongSwan VM in the homelab (`192.168.1.0/24`), which sits behind a double NAT. The strongSwan side is still being configured, so it's drawn dashed.
 
-Multi-AZ VPC Provisioned via Terraform,deployed through GitHub actions Using OIDC, monitored with CloudWatch/CloudTrail and linked to on prem homelab over a site to site VPN.
- 
+The diagrams are maintained in my portfolio repo and copied here.
 
-## Tech Stack 
+## Tech Stack
+
 | Layer | Tool |
-|:-------|--------:|
-|IAC   |Terraform (1.10+,native S3 state locking)|
-|Cloud provider| AWS |
-|CI/CD | GitHub Actions(OIDC auth)|
-|Monitoring| CloudWatch,CloudTrail|
-|Hybrid link| AWS Site to Site VPN <-> Proxmox Homelab|
+|:------|:-----|
+| IaC | Terraform (1.10+, native S3 state locking) |
+| Cloud provider | AWS (`ca-central-1`) |
+| CI/CD | GitHub Actions (OIDC auth, environment approval gate) |
+| Monitoring | CloudWatch (dashboard), CloudTrail (account-level) |
+| Hybrid link | AWS Site-to-Site VPN (VGW) <-> strongSwan on Proxmox |
 
 ## Repository Structure
+
 ```
 .
 ├── .github/
 │   └── workflows/
-│       └── terraform.yml      # plan on PR, apply on merge to main (environments/dev, modules/network)
+│       └── terraform.yml          # plan on every PR (required check); gated apply on merge to main
 ├── docs/
-│   ├── hybridhomelab.drawio.svg   # architecture diagram
+│   ├── hybridhomelab.svg          # cloud architecture diagram
+│   ├── homelab-network.svg        # homelab network diagram
 │   └── tagging.md                 # cost-allocation tagging standard
 ├── environments/
-│   ├── bootstrap/             # OIDC provider + IAM role for GitHub Actions, applied manually once
-│   └── dev/                   # dev environment: network module + S3 remote state backend
-│       └── waste-lab.tf       # placeholder, not wired up yet
+│   ├── bootstrap/                 # OIDC provider + plan/apply IAM roles, applied locally only
+│   └── dev/                       # network + site-to-site VPN modules, S3 remote state
+│       └── waste-lab.tf           # placeholder, not wired up yet
 ├── modules/
-│   ├── network/               # VPC, 2 public + 2 private subnets, IGW, NAT, route tables
-│   ├── cicd-oidc/             # GitHub OIDC provider + IAM role (state access, VPC permissions)
-│   └── waste-lab/             # scaffold only
+│   ├── network/                   # VPC, 2 public + 2 private subnets, IGW, NAT, route tables, NAT dashboard
+│   ├── site-to-site-vpn/          # VGW, customer gateway, static-route IPsec VPN, route propagation
+│   ├── github-oidc-role/          # reusable GitHub OIDC IAM role (exact subjects, scoped policies)
+│   ├── cicd-oidc/                 # legacy wildcard role, unused, scheduled for removal
+│   └── waste-lab/                 # scaffold only
 ├── LICENSE
 └── README.md
 ```
 
-## Setup 
-Deployment Automation is completed. When a PR is opened touching `environments/dev/` or `modules/network/`-> GitHub Actions runs `terraform plan` automatically via OIDC so changes can be reviewed. Once the PR is merged to `main`, GitHub Actions runs `terraform apply` automatically which means nobody has to run terraform by hand and no long lived AWS credentials are required in the process. 
-## Design Decisions 
-Each entry: what I chose, why, and what it costs me.
+## How deployment works
 
-1. Terraform state in S3 with native locking
+1. **Pull request**: every PR runs `terraform validate` and `terraform plan` against dev through a **read-only plan role**. The plan is a required status check, so nothing merges until it passes.
+2. **Merge to `main`**: when the merge changes `environments/dev/` or a module dev uses, the apply job starts and **pauses for approval** in the `dev` GitHub environment. Docs-only and CI-only merges don't deploy.
+3. **Approval**: once approved, the job assumes a separate **apply role**, plans again, and applies that saved plan.
 
-Decision: Remote state in an encrypted S3 bucket, locked with use_lockfile = true (Terraform 1.10+). Why: It avoids the DynamoDB lock table that older setups needed, so there is one less resource to build, pay for and secure. Trade-off: Requires Terraform 1.10 or newer. The state bucket itself is not managed by this repo's Terraform.
+The homelab's public IP is supplied from a GitHub Actions secret and marked `sensitive` in Terraform, so it never appears in code or in the public Actions logs.
 
-2. GitHub Actions authenticates with OIDC, not access keys
+### Running locally
 
-Decision: The pipeline assumes an IAM role through OIDC federation. No AWS keys are stored in GitHub. Why: Credentials are short-lived, so there is nothing to rotate or leak. Scope: The role is trusted only for this repository. Its permissions are state-bucket access plus AmazonVPCFullAccess, and they grow only as modules need them. Known limitation: The trust condition matches any branch or event in the repo. Planned hardening: restrict it to main and pull requests.
+```bash
+export TF_VAR_homelab_public_ip=<your public IP>
+terraform -chdir=environments/dev init
+terraform -chdir=environments/dev plan
+```
 
-3. Plan on every pull request, apply only on merge
+Local runs need Terraform 1.10+ and AWS credentials with access to the state bucket. Changes to shared infrastructure go through a pull request, not a local apply.
 
-Decision: A PR touching environments/dev/ or modules/network/ runs terraform plan. A merge to main runs terraform apply. Why: Every change is reviewed before it lands, and nobody runs Terraform by hand against shared infrastructure. Note: Manual workflow runs only plan. Applying happens through a merge or locally.
+## Design Decisions
 
-4. Bootstrap is separate from the environment
+Each entry covers what I chose, why, and what it costs me.
 
-Decision: The OIDC provider and role live in environments/bootstrap/ and were applied manually once. Why: The pipeline cannot create the role it needs in order to run. Keeping this apart also means the pipeline cannot change its own access.
+**1. Terraform state in S3 with native locking**
 
-5. One NAT gateway in dev
+Decision: Remote state in an encrypted S3 bucket, locked with `use_lockfile = true` (Terraform 1.10+).
+Why: It avoids the DynamoDB lock table that older setups needed, so there's one less resource to build, pay for and secure.
+Trade-off: Requires Terraform 1.10 or newer. The state bucket itself is created outside this repo's Terraform.
 
-Decision: Dev shares a single NAT gateway across both AZs (single_nat_gateway = true, the module default). Why: NAT gateways bill by the hour whether or not traffic flows, so one shared gateway cuts the idle cost. Trade-off: Private subnets in the second AZ depend on a gateway in the first, which is a single point of failure. A production environment would set this to false.
+**2. GitHub Actions authenticates with OIDC, not access keys**
 
-6. No IAM Identity Center
+Decision: The pipeline assumes IAM roles through OIDC federation. No AWS keys are stored in GitHub.
+Why: Credentials are short-lived, so there's nothing to rotate or leak.
+Scope: There are two roles. The **plan role** is trusted only for `pull_request` runs and is read-only, apart from the dev state lock. The **apply role** is trusted only for jobs running in the `dev` GitHub environment, which requires approval and only deploys from `main`. Neither role can read the bootstrap state.
+Remaining hardening: `AmazonVPCFullAccess` and `ReadOnlyAccess` are broad AWS-managed policies, and I plan to narrow them.
 
-Decision: I do not use the root account for daily work. I use a separate IAM identity with roles scoped to this project. Why: Enabling IAM Identity Center would void the credits on my AWS account. Trade-off: In a real multi-account organization I would use Identity Center with permission sets and short-lived credentials.
+**3. Plan on every pull request, gated apply on merge**
 
-7. The dev environment is created on demand
+Decision: Every PR runs `terraform plan` as a required check. A merge to `main` that changes dev runs the apply job, gated by an approval in the `dev` environment.
+Why: Every change is reviewed, and nothing reaches AWS without a human approving it.
+Note: A manual workflow run on `main` triggers the gated apply, not a plan.
+Known gap: The apply job plans again after approval, so the approver doesn't see the exact plan that gets applied. The fix on the roadmap is to plan on `main` and hand that plan to the gated apply job as an artifact.
 
-Decision: Dev is destroyed when not in use (terraform destroy in environments/dev/) and recreated when needed. Why: It keeps spend inside my credits. Trade-off: There is no always-on infrastructure to click through. The code, plan output and diagram are the evidence.
+**4. Bootstrap is separate from the environment**
 
-8. A tagging standard for cost attribution
+Decision: The OIDC provider and the plan/apply roles live in `environments/bootstrap/` and are applied locally, never by CI.
+Why: The pipeline can't create the roles it needs in order to run. Keeping bootstrap separate also means the pipeline can't change its own access.
 
-Decision: Resources follow docs/tagging.md. Project, Environment, Owner and ManagedBy come from provider default_tags. Why: It lets cost data be broken down per component, such as the dev NAT gateway, and it feeds a planned cost-optimizer project. Status: The module-level Purpose and ExpiresOn tags are not applied yet.
+**5. One NAT gateway in dev**
 
-Open decision: how the VPN terminates
+Decision: Dev shares a single NAT gateway across both AZs (`single_nat_gateway = true`, the module default).
+Why: NAT gateways bill by the hour whether or not traffic flows, so one shared gateway cuts the idle cost.
+Trade-off: Private subnets in the second AZ depend on a gateway in the first, which is a single point of failure. A production environment would set this to `false`.
 
-(Fill this in once the choice is made.) Options: strongSwan VM on Proxmox, the RV260's native IPsec, or a Tailscale subnet router on EC2. The home network sits behind a double NAT, which affects all IPsec options.
+**6. No IAM Identity Center**
+
+Decision: I don't use the root account for daily work. I use a separate IAM identity, with roles scoped to this project.
+Why: Enabling IAM Identity Center would void the credits on my AWS account.
+Trade-off: In a real multi-account organization I would use Identity Center with permission sets and short-lived credentials.
+
+**7. The dev environment is created on demand**
+
+Decision: Dev is destroyed when not in use and rebuilt through the pipeline when needed.
+Why: It keeps spend inside my credits. The NAT gateway and VPN connection together cost about USD 2.40/day while running.
+Trade-off: There's no always-on infrastructure to click through. The code, plan output and diagrams are the evidence.
+
+**8. A tagging standard for cost attribution**
+
+Decision: Resources follow [docs/tagging.md](docs/tagging.md). `Project`, `Environment`, `Owner` and `ManagedBy` come from provider `default_tags`.
+Why: It lets cost data be broken down per component, such as the dev NAT gateway, and it feeds [CloudGuard](https://github.com/Mannixgr/CloudGuard), my AWS cost and security scanner, which groups its findings by these tags.
+Status: The module-level `Purpose` and `ExpiresOn` tags aren't applied yet.
+
+**9. The VPC moved to 10.20.0.0/16**
+
+Decision: Dev uses `10.20.0.0/16`, set in `environments/dev`. The module defaults are unchanged.
+Why: The original `10.0.0.0/16` overlapped the ISP gateway's network (`10.0.0.0/24`) on the homelab side, which would have broken routing over the VPN.
+Trade-off: Changing a VPC's CIDR replaces the VPC, so I made the change before the VPN existed.
+
+**10. The VPN terminates on a strongSwan VM**
+
+Decision: An AWS Virtual Private Gateway with a static-route IPsec connection to a strongSwan VM on Proxmox (route-based, using VTI interfaces).
+Why: The home network sits behind a double NAT (ISP gateway, then a Cisco RV260), and strongSwan handles NAT traversal and route-based tunnels well. Static routing means I don't have to run BGP on the VM. The tunnel inside CIDRs are pinned, so the VM config is known before the tunnels exist.
+Trade-offs: The home public IP is dynamic. If it changes, the customer gateway and VPN connection are replaced, which brings new tunnel endpoints and keys. The VM is a single point of failure on the homelab side. The VPN connection costs about USD 0.05/hour, so it's destroyed with the rest of dev when not in use.
+
 ## Roadmap
+
 - [x] Repo scaffolded with module structure
-- [x] AWS account Hygiene - MFA,billing alerts,CloudTrail 
-- [x] Terraform Remote state backend (S3 native locking)
-- [x] Multi-AZ VPC module 
-- [x] GitHub Actions OIDC Pipeline (Plan on PR,apply on merge)
-- [x] Tagging standard documented (docs/tagging.md)
-- [ ] Apply the Purpose tag at module level
-- [ ] Site to Site VPN link to homelab 
-- [ ] CloudWatch dashboard + alarms
+- [x] AWS account hygiene: MFA, billing alerts, CloudTrail
+- [x] Terraform remote state backend (S3 native locking)
+- [x] Multi-AZ VPC module
+- [x] GitHub Actions OIDC pipeline (plan on PR, apply on merge)
+- [x] Separate plan/apply IAM roles + environment approval gate
+- [x] Tagging standard documented ([docs/tagging.md](docs/tagging.md))
+- [x] CloudWatch dashboard for the NAT gateway
+- [ ] Site-to-Site VPN: AWS side built; strongSwan configuration in progress
+- [ ] CloudWatch alarms + billing alarm for VPN/NAT
+- [ ] CloudTrail codified in Terraform
+- [ ] Plan on `main` and apply that reviewed plan as an artifact (no re-plan after approval)
+- [ ] CI quality gates: `terraform fmt -check`, tflint, security scanning, actions pinned by commit SHA
+- [ ] Narrow managed IAM policies to least privilege
+- [ ] Retire the legacy `cicd-oidc` role
+- [ ] Apply the `Purpose` and `ExpiresOn` tags at module level
 - [ ] waste-lab module (scaffold only so far)
-## Status 
-In Progress. This README will be updated as I complete the project.
-## License 
+
+## Status
+
+In progress (last updated October 2026). I'll update this README as I complete each part of the project.
+
+## License
+
 MIT
-
-
