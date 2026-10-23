@@ -10,10 +10,3 @@ resource "aws_iam_openid_connect_provider" "github_actions" {
   client_id_list  = ["sts.amazonaws.com"]
   thumbprint_list = [data.tls_certificate.github_actions.certificates[0].sha1_fingerprint]
 }
-
-# The provider used to live inside the cicd-oidc module. This tells Terraform
-# it is the same object at a new address, so it is not destroyed and recreated.
-moved {
-  from = module.cicd_oidc.aws_iam_openid_connect_provider.github_actions
-  to   = aws_iam_openid_connect_provider.github_actions
-}

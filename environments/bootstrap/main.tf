@@ -1,8 +1,4 @@
-module "cicd_oidc" {
-  source            = "../../modules/cicd-oidc"
-  github_repo       = "Mannixgr@76853105/enterprise-hybrid-aws@1298833769"
-  oidc_provider_arn = aws_iam_openid_connect_provider.github_actions.arn
-}
+
 locals {
   gh_sub_prefix    = "repo:Mannixgr@76853105/enterprise-hybrid-aws@1298833769"
   state_bucket_arn = "arn:aws:s3:::mannix-enterprise-hybrid-aws-tfstate"
