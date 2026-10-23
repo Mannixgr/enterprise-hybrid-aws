@@ -25,6 +25,12 @@ data "aws_iam_policy_document" "plan_state" {
     actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
     resources = ["${local.state_bucket_arn}/${local.dev_state_key}.tflock"]
   }
+  statement {
+    sid           = "DenyObjectReadsExceptDevState"
+    effect        = "Deny"
+    actions       = ["s3:GetObject", "s3:GetObjectVersion"]
+    not_resources = ["${local.state_bucket_arn}/${local.dev_state_key}", "${local.state_bucket_arn}/${local.dev_state_key}.tflock"]
+  }
 }
 
 module "github_plan_role" {
