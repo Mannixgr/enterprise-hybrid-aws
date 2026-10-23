@@ -50,7 +50,6 @@ The diagrams are maintained in my portfolio repo and copied here.
 │   ├── network/                   # VPC, 2 public + 2 private subnets, IGW, NAT, route tables, NAT dashboard
 │   ├── site-to-site-vpn/          # VGW, customer gateway, static-route IPsec VPN, route propagation
 │   ├── github-oidc-role/          # reusable GitHub OIDC IAM role (exact subjects, scoped policies)
-│   ├── cicd-oidc/                 # legacy wildcard role, unused, scheduled for removal
 │   └── waste-lab/                 # scaffold only
 ├── LICENSE
 └── README.md
@@ -155,7 +154,7 @@ Trade-offs: The home public IP is dynamic. If it changes, the customer gateway a
 - [ ] Plan on `main` and apply that reviewed plan as an artifact (no re-plan after approval)
 - [ ] CI quality gates: `terraform fmt -check`, tflint, security scanning, actions pinned by commit SHA
 - [ ] Narrow managed IAM policies to least privilege
-- [ ] Retire the legacy `cicd-oidc` role
+- [x] Retire the legacy `cicd-oidc` role
 - [ ] Apply the `Purpose` and `ExpiresOn` tags at module level
 - [ ] waste-lab module (scaffold only so far)
 
