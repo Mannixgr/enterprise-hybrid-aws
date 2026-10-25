@@ -9,7 +9,7 @@ The aim is to replace manual, click-ops cloud setup with the kind of workflow a 
 - **Infrastructure as Code**: a multi-AZ AWS VPC, core networking and a site-to-site VPN, all built with Terraform instead of the console, so the environment can be torn down and rebuilt from the repo.
 - **Secure CI/CD**: GitHub Actions authenticates to AWS with OIDC federation, so no long-lived AWS access keys are stored anywhere. Planning and applying use separate IAM roles, and every apply waits for a human to approve it.
 - **Monitoring & observability**: a CloudWatch dashboard for the NAT gateway is built in code. CloudTrail is enabled at the account level (codifying it in Terraform is on the roadmap), and CloudWatch alarms are next.
-- **Hybrid networking**: the AWS VPC connects to a real on-premises Proxmox homelab over an IPsec site-to-site VPN, so this is more than a cloud-only sandbox. The AWS side is built; the homelab endpoint is in progress.
+- **Hybrid networking**: the AWS VPC connects to a real on-premises Proxmox homelab over an IPsec site-to-site VPN, so this is more than a cloud-only sandbox. Both tunnels are up to a strongSwan VM in the homelab; testing traffic from homelab hosts into the VPC is next.
 
 ## Architecture
 
@@ -17,9 +17,9 @@ The aim is to replace manual, click-ops cloud setup with the kind of workflow a 
 
 ![Homelab network: double NAT, Proxmox LAN, strongSwan VPN endpoint](https://raw.githubusercontent.com/Mannixgr/mannix-portfolio/main/homelab-network.svg)
 
-A multi-AZ VPC (`10.20.0.0/16`) in `ca-central-1` is provisioned with Terraform and deployed through GitHub Actions using OIDC. A Virtual Private Gateway provides two IPsec tunnels for a strongSwan VM in the homelab (`192.168.1.0/24`), which sits behind a double NAT. The strongSwan side is still being configured, so it's drawn dashed.
+A multi-AZ VPC (`10.20.0.0/16`) in `ca-central-1` is provisioned with Terraform and deployed through GitHub Actions using OIDC. A Virtual Private Gateway provides two IPsec tunnels for a strongSwan VM in the homelab (`192.168.1.0/24`), which sits behind a double NAT. The VM ends both tunnels with XFRM interfaces, and the Cisco RV260 routes `10.20.0.0/16` to it.
 
-The diagrams are maintained in my portfolio repo and copied here.
+The diagrams are maintained in my portfolio repo and embedded here, so one edit updates both.
 
 ## Tech Stack
 
@@ -132,7 +132,7 @@ Trade-off: Changing a VPC's CIDR replaces the VPC, so I made the change before t
 
 **10. The VPN terminates on a strongSwan VM**
 
-Decision: An AWS Virtual Private Gateway with a static-route IPsec connection to a strongSwan VM on Proxmox (route-based, using VTI interfaces).
+Decision: An AWS Virtual Private Gateway with a static-route IPsec connection to a strongSwan VM on Proxmox (route-based, using XFRM interfaces).
 Why: The home network sits behind a double NAT (ISP gateway, then a Cisco RV260), and strongSwan handles NAT traversal and route-based tunnels well. Static routing means I don't have to run BGP on the VM. The tunnel inside CIDRs are pinned, so the VM config is known before the tunnels exist.
 Trade-offs: The home public IP is dynamic. If it changes, the customer gateway and VPN connection are replaced, which brings new tunnel endpoints and keys. The VM is a single point of failure on the homelab side. The VPN connection costs about USD 0.05/hour, so it's destroyed with the rest of dev when not in use.
 
@@ -146,7 +146,8 @@ Trade-offs: The home public IP is dynamic. If it changes, the customer gateway a
 - [x] Separate plan/apply IAM roles + environment approval gate
 - [x] Tagging standard documented ([docs/tagging.md](docs/tagging.md))
 - [x] CloudWatch dashboard for the NAT gateway
-- [ ] Site-to-Site VPN: AWS side built; strongSwan configuration in progress
+- [x] Site-to-Site VPN: two IPsec tunnels up to strongSwan on Proxmox
+- [ ] Test homelab-to-VPC traffic over the tunnels
 - [ ] CloudWatch alarms + billing alarm for VPN/NAT
 - [ ] CloudTrail codified in Terraform
 - [ ] Plan on `main` and apply that reviewed plan as an artifact (no re-plan after approval)
