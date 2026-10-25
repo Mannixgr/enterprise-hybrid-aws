@@ -13,9 +13,9 @@ The aim is to replace manual, click-ops cloud setup with the kind of workflow a 
 
 ## Architecture
 
-![Cloud architecture: gated CI/CD, multi-AZ VPC, site-to-site VPN](docs/hybridhomelab.svg)
+![Cloud architecture: gated CI/CD, multi-AZ VPC, site-to-site VPN](https://raw.githubusercontent.com/Mannixgr/mannix-portfolio/main/hybridhomelab.svg)
 
-![Homelab network: double NAT, Proxmox LAN, strongSwan VPN endpoint](docs/homelab-network.svg)
+![Homelab network: double NAT, Proxmox LAN, strongSwan VPN endpoint](https://raw.githubusercontent.com/Mannixgr/mannix-portfolio/main/homelab-network.svg)
 
 A multi-AZ VPC (`10.20.0.0/16`) in `ca-central-1` is provisioned with Terraform and deployed through GitHub Actions using OIDC. A Virtual Private Gateway provides two IPsec tunnels for a strongSwan VM in the homelab (`192.168.1.0/24`), which sits behind a double NAT. The strongSwan side is still being configured, so it's drawn dashed.
 
@@ -39,8 +39,6 @@ The diagrams are maintained in my portfolio repo and copied here.
 │   └── workflows/
 │       └── terraform.yml          # plan on every PR (required check); gated apply on merge to main
 ├── docs/
-│   ├── hybridhomelab.svg          # cloud architecture diagram
-│   ├── homelab-network.svg        # homelab network diagram
 │   └── tagging.md                 # cost-allocation tagging standard
 ├── environments/
 │   ├── bootstrap/                 # OIDC provider + plan/apply IAM roles, applied locally only
