@@ -41,7 +41,7 @@ The diagrams are maintained in my portfolio repo and embedded here, so one edit 
 ├── docs/
 │   └── tagging.md                 # cost-allocation tagging standard
 ├── environments/
-│   ├── bootstrap/                 # OIDC provider + plan/apply IAM roles, applied locally only
+│   ├── bootstrap/                 # OIDC provider, plan/apply IAM roles, CloudGuard read-only role; applied locally only
 │   └── dev/                       # network + site-to-site VPN modules, S3 remote state
 │       └── waste-lab.tf           # placeholder, not wired up yet
 ├── modules/
@@ -136,6 +136,12 @@ Decision: An AWS Virtual Private Gateway with a static-route IPsec connection to
 Why: The home network sits behind a double NAT (ISP gateway, then a Cisco RV260), and strongSwan handles NAT traversal and route-based tunnels well. Static routing means I don't have to run BGP on the VM. The tunnel inside CIDRs are pinned, so the VM config is known before the tunnels exist.
 Trade-offs: The home public IP is dynamic. If it changes, the customer gateway and VPN connection are replaced, which brings new tunnel endpoints and keys. The VM is a single point of failure on the homelab side. The VPN connection costs about USD 0.05/hour, so it's destroyed with the rest of dev when not in use.
 
+**11. A separate read-only role for CloudGuard**
+
+Decision: `cloudguard-readonly` lives in bootstrap and is assumed by my IAM user only, with MFA. It has `SecurityAudit` and `job-function/ViewOnlyAccess`, plus an explicit Deny on reading objects in the state bucket.
+Why: [CloudGuard](https://github.com/Mannixgr/CloudGuard) scans this account, and it should read configuration, never data. `ReadOnlyAccess` was ruled out because its `s3:Get*` reads the contents of any bucket. A leaked access key alone can't assume the role.
+Trade-off: Every scan needs an MFA code. Cost Explorer isn't granted yet.
+
 ## Roadmap
 
 - [x] Repo scaffolded with module structure
@@ -154,6 +160,7 @@ Trade-offs: The home public IP is dynamic. If it changes, the customer gateway a
 - [ ] CI quality gates: `terraform fmt -check`, tflint, security scanning, actions pinned by commit SHA
 - [ ] Narrow managed IAM policies to least privilege
 - [x] Retire the legacy `cicd-oidc` role
+- [x] Read-only, MFA-gated scanner role for CloudGuard
 - [ ] Apply the `Purpose` and `ExpiresOn` tags at module level
 - [ ] waste-lab module (scaffold only so far)
 
